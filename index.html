@@ -87,18 +87,24 @@
             border-radius: 4px;
             background-color: #f9f9f9;
             margin-top: 20px;
+            font-size: 18px;
+            line-height: 1.8;
         }
         .line {
-            margin-bottom: 10px;
+            margin-bottom: 15px;
             padding: 5px;
-            font-weight: 600;
         }
         .hidden-word {
             color: #666;
-            background-color: #e0e0e0;
+            background-color: #f0f0f0;
             padding: 2px 4px;
             border-radius: 3px;
             margin: 0 2px;
+            font-family: monospace;
+        }
+        .fully-hidden {
+            color: #999;
+            background-color: #e0e0e0;
         }
         .counter {
             color: #666;
@@ -118,6 +124,9 @@
             button {
                 padding: 10px 16px;
                 font-size: 14px;
+            }
+            #textOutput {
+                font-size: 16px;
             }
         }
 
@@ -146,148 +155,208 @@
     </style>
 </head>
 <body>
-    <h1>Изучение текста</h1>
-    
-    <textarea id="textInput" placeholder="Введите текст для изучения..."></textarea>
-    
-    <div class="regular-controls">
-        <button id="loadButton" onclick="loadText()">Загрузить текст</button>
-        <button id="showAllButton" onclick="showAllText()">Показать весь текст</button>
+<h1>Изучение текста</h1>
+
+<textarea id="textInput" placeholder="Введите текст для изучения..."></textarea>
+
+<div class="regular-controls">
+    <button id="loadButton" onclick="loadText()">Загрузить текст</button>
+    <button id="showAllButton" onclick="showAllText()">Показать весь текст</button>
+</div>
+
+<div class="fixed-controls">
+    <div class="fixed-buttons">
+        <button id="hideButton" onclick="hideNextWords()" disabled>Hide</button>
+        <button id="backButton" onclick="showPreviousWords()" disabled>Назад</button>
     </div>
-    
-    <div class="fixed-controls">
-        <div class="fixed-buttons">
-            <button id="hideButton" onclick="hideNextWords()" disabled>Hide</button>
-            <button id="backButton" onclick="showPreviousWords()" disabled>Назад</button>
-        </div>
-        <span id="counter" class="counter"></span>
-    </div>
-    
-    <div id="textOutput"></div>
+    <span id="counter" class="counter"></span>
+</div>
 
-    <script>
-        let originalLines = [];
-        let currentHiddenCount = 0;
-        let maxWordsInLine = 0;
+<div id="textOutput"></div>
 
-        function loadText() {
-            const textInput = document.getElementById('textInput').value.trim();
-            if (!textInput) {
-                alert('Пожалуйста, введите текст');
-                return;
-            }
+<script>
+  let originalLines = [];
+  let currentHiddenCount = 0;
+  let maxWordsInLine = 0;
+  let currentStage = 0; // 0 - обычный текст, 1 - скрытие с буквами, 2 - полное скрытие
 
-            originalLines = textInput.split('\n').filter(line => line.trim() !== '');
-            currentHiddenCount = 0;
-            
-            // Сворачиваем textarea
-            document.getElementById('textInput').classList.add('collapsed');
-            
-            // Находим максимальное количество скрываемых слов (исключая числа в начале строк)
-            maxWordsInLine = Math.max(...originalLines.map(line => {
-                const words = line.split(/\s+/);
-                let count = 0;
-                
-                // Считаем только слова, которые не являются числами в начале строки
-                words.forEach((word, index) => {
-                    // Если это не первое слово ИЛИ первое слово не является числом
-                    if (index > 0 || !/^\d+\.?$/.test(word)) {
-                        count++;
-                    }
-                });
-                
-                return count;
-            }));
-            
-            displayText();
-            updateButtons();
+  function loadText() {
+    const textInput = document.getElementById('textInput').value.trim();
+    if (!textInput) {
+      alert('Пожалуйста, введите текст');
+      return;
+    }
+
+    originalLines = textInput.split('\n').filter(line => line.trim() !== '');
+    currentHiddenCount = 0;
+    currentStage = 0;
+
+    // Сворачиваем textarea
+    document.getElementById('textInput').classList.add('collapsed');
+
+    // Находим максимальное количество скрываемых слов (исключая числа в начале строк)
+    maxWordsInLine = Math.max(...originalLines.map(line => {
+      const words = line.split(/\s+/);
+      let count = 0;
+
+      // Считаем только слова, которые не являются числами в начале строки
+      words.forEach((word, index) => {
+        // Если это не первое слово ИЛИ первое слово не является числом
+        if (index > 0 || !/^\d+\.?$/.test(word)) {
+          count++;
+        }
+      });
+
+      return count;
+    }));
+
+    displayText();
+    updateButtons();
+  }
+
+  function hideNextWords() {
+    if (currentStage === 0) {
+      // Первый этап - постепенное скрытие слов
+      if (currentHiddenCount < maxWordsInLine) {
+        currentHiddenCount++;
+      } else {
+        // Переходим ко второму этапу - полному скрытию
+        currentStage = 1;
+        currentHiddenCount = 0;
+      }
+    } else if (currentStage === 1) {
+      // Второй этап - постепенное полное скрытие
+      if (currentHiddenCount < maxWordsInLine) {
+        currentHiddenCount++;
+      }
+    }
+    displayText();
+  }
+
+  function showPreviousWords() {
+    if (currentStage === 1) {
+      // Второй этап - возвращаем из полного скрытия
+      if (currentHiddenCount > 0) {
+        currentHiddenCount--;
+      } else {
+        // Возвращаемся к первому этапу
+        currentStage = 0;
+        currentHiddenCount = maxWordsInLine;
+      }
+    } else if (currentStage === 0) {
+      // Первый этап - возвращаем слова
+      if (currentHiddenCount > 0) {
+        currentHiddenCount--;
+      }
+    }
+    displayText();
+  }
+
+  function displayText() {
+    const textOutput = document.getElementById('textOutput');
+    textOutput.innerHTML = '';
+
+    originalLines.forEach((line, lineIndex) => {
+      const lineDiv = document.createElement('div');
+      lineDiv.className = 'line';
+
+      const words = line.split(/\s+/);
+      let hiddenWordsInThisLine = 0;
+
+      words.forEach((word, wordIndex) => {
+        const span = document.createElement('span');
+
+        // Проверяем, является ли слово числом в начале строки
+        const isNumberAtStart = wordIndex === 0 && /^\d+\.?$/.test(word);
+
+        if (!isNumberAtStart && hiddenWordsInThisLine < currentHiddenCount) {
+          if (currentStage === 0) {
+            // Первый этап: скрытие с сохранением букв
+            span.textContent = hideWordWithLetters(word);
+            span.className = 'hidden-word';
+          } else if (currentStage === 1) {
+            // Второй этап: полное скрытие символами '_'
+            span.textContent = hideWordCompletely(word);
+            span.className = 'hidden-word fully-hidden';
+          }
+          hiddenWordsInThisLine++;
+        } else {
+          span.textContent = word;
         }
 
-        function displayText() {
-            const textOutput = document.getElementById('textOutput');
-            textOutput.innerHTML = '';
+        lineDiv.appendChild(span);
 
-            originalLines.forEach((line, lineIndex) => {
-                const lineDiv = document.createElement('div');
-                lineDiv.className = 'line';
-                
-                const words = line.split(/\s+/);
-                let hiddenWordsInThisLine = 0;
-                
-                words.forEach((word, wordIndex) => {
-                    const span = document.createElement('span');
-                    
-                    // Проверяем, является ли слово числом в начале строки
-                    const isNumberAtStart = wordIndex === 0 && /^\d+\.?$/.test(word);
-                    
-                    if (!isNumberAtStart && hiddenWordsInThisLine < currentHiddenCount) {
-                        // Скрытое слово - первая буква + три точки
-                        span.textContent = word.charAt(0) + '...';
-                        span.className = 'hidden-word';
-                        hiddenWordsInThisLine++;
-                    } else {
-                        span.textContent = word;
-                    }
-                    
-                    lineDiv.appendChild(span);
-                    
-                    // Добавляем пробел между словами
-                    if (wordIndex < words.length - 1) {
-                        lineDiv.appendChild(document.createTextNode(' '));
-                    }
-                });
-                
-                textOutput.appendChild(lineDiv);
-            });
-
-            updateButtons();
+        // Добавляем пробел между словами
+        if (wordIndex < words.length - 1) {
+          lineDiv.appendChild(document.createTextNode(' '));
         }
+      });
 
-        function hideNextWords() {
-            if (currentHiddenCount < maxWordsInLine) {
-                currentHiddenCount++;
-                displayText();
-            }
-        }
+      textOutput.appendChild(lineDiv);
+    });
 
-        function showPreviousWords() {
-            if (currentHiddenCount > 0) {
-                currentHiddenCount--;
-                displayText();
-            }
-        }
+    updateButtons();
+  }
 
-        function updateButtons() {
-            const hideButton = document.getElementById('hideButton');
-            const backButton = document.getElementById('backButton');
-            const counter = document.getElementById('counter');
-            
-            hideButton.disabled = currentHiddenCount >= maxWordsInLine;
-            backButton.disabled = currentHiddenCount <= 0;
-            
-            // Обновляем счетчик
-            counter.textContent = `${currentHiddenCount}/${maxWordsInLine}`;
-        }
+  function hideWordWithLetters(word) {
+    if (word.length <= 1) return word;
 
-        function showAllText() {
-            // Разворачиваем textarea
-            document.getElementById('textInput').classList.remove('collapsed');
-            
-            // Сбрасываем состояние
-            currentHiddenCount = 0;
-            originalLines = [];
-            document.getElementById('hideButton').disabled = true;
-            document.getElementById('backButton').disabled = true;
-            document.getElementById('counter').textContent = '';
-            document.getElementById('textOutput').innerHTML = '';
-        }
+    if (word.length >= 5) {
+      // Для слов из 5+ букв: первая буква, затем '_', затем последняя буква
+      const firstLetter = word.charAt(0);
+      const lastLetter = word.charAt(word.length - 1);
+      const middleStars = '_'.repeat(word.length - 2);
+      return firstLetter + middleStars + lastLetter;
+    } else {
+      // Для коротких слов: первая буква, затем '_'
+      const firstLetter = word.charAt(0);
+      const stars = '_'.repeat(word.length - 1);
+      return firstLetter + stars;
+    }
+  }
 
-        // Обработка Enter в текстовом поле
-        document.getElementById('textInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter' && e.ctrlKey) {
-                loadText();
-            }
-        });
-    </script>
+  function hideWordCompletely(word) {
+    // Полное скрытие символами '_'
+    return '_'.repeat(word.length);
+  }
+
+  function updateButtons() {
+    const hideButton = document.getElementById('hideButton');
+    const backButton = document.getElementById('backButton');
+    const counter = document.getElementById('counter');
+
+    let stageText = currentStage === 0 ? "Скрытие букв" : "Полное скрытие";
+    let progress = currentStage === 0 ?
+      `${currentHiddenCount}/${maxWordsInLine}` :
+      `${currentHiddenCount}/${maxWordsInLine}`;
+
+    hideButton.disabled = currentStage === 1 && currentHiddenCount >= maxWordsInLine;
+    backButton.disabled = currentStage === 0 && currentHiddenCount <= 0;
+
+    // Обновляем счетчик
+    counter.textContent = `${stageText}: ${progress}`;
+  }
+
+  function showAllText() {
+    // Разворачиваем textarea
+    document.getElementById('textInput').classList.remove('collapsed');
+
+    // Сбрасываем состояние
+    currentHiddenCount = 0;
+    currentStage = 0;
+    originalLines = [];
+    document.getElementById('hideButton').disabled = true;
+    document.getElementById('backButton').disabled = true;
+    document.getElementById('counter').textContent = '';
+    document.getElementById('textOutput').innerHTML = '';
+  }
+
+  // Обработка Enter в текстовом поле
+  document.getElementById('textInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter' && e.ctrlKey) {
+      loadText();
+    }
+  });
+</script>
 </body>
 </html>
