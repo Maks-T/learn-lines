@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Изучение текста</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+            padding-top: 80px; /* Место для фиксированной панели */
+        }
+        textarea {
+            width: 100%;
+            height: 150px;
+            margin-bottom: 10px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            transition: height 0.3s ease;
+        }
+        textarea.collapsed {
+            height: 0;
+            padding: 0;
+            margin: 0;
+            overflow: hidden;
+            border: none;
+        }
+        .fixed-controls {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            border-bottom: 1px solid #ddd;
+        }
+        .regular-controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        #backButton {
+            background-color: #2196F3;
+        }
+        #backButton:hover {
+            background-color: #0b7dda;
+        }
+        #showAllButton {
+            background-color: #ff9800;
+        }
+        #showAllButton:hover {
+            background-color: #e68900;
+        }
+        #loadButton {
+            background-color: #4CAF50;
+        }
+        #textOutput {
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+            margin-top: 20px;
+        }
+        .line {
+            margin-bottom: 10px;
+            padding: 5px;
+            font-weight: 600;
+        }
+        .hidden-word {
+            color: #666;
+            background-color: #e0e0e0;
+            padding: 2px 4px;
+            border-radius: 3px;
+            margin: 0 2px;
+        }
+        .counter {
+            color: #666;
+            font-size: 14px;
+            margin-left: 10px;
+            flex-shrink: 0;
+        }
+
+        /* Адаптивность для мобильных */
+        @media (max-width: 768px) {
+            body {
+                padding-top: 90px;
+            }
+            .fixed-controls {
+                padding: 12px 15px;
+            }
+            button {
+                padding: 10px 16px;
+                font-size: 14px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding-top: 100px;
+            }
+            .fixed-controls {
+                flex-direction: column;
+                gap: 8px;
+                padding: 10px;
+            }
+            .fixed-buttons {
+                display: flex;
+                gap: 10px;
+                width: 100%;
+            }
+            .fixed-buttons button {
+                flex: 1;
+            }
+            .counter {
+                margin-left: 0;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Изучение текста</h1>
+    
+    <textarea id="textInput" placeholder="Введите текст для изучения..."></textarea>
+    
+    <div class="regular-controls">
+        <button id="loadButton" onclick="loadText()">Загрузить текст</button>
+        <button id="showAllButton" onclick="showAllText()">Показать весь текст</button>
+    </div>
+    
+    <div class="fixed-controls">
+        <div class="fixed-buttons">
+            <button id="hideButton" onclick="hideNextWords()" disabled>Hide</button>
+            <button id="backButton" onclick="showPreviousWords()" disabled>Назад</button>
+        </div>
+        <span id="counter" class="counter"></span>
+    </div>
+    
+    <div id="textOutput"></div>
+
+    <script>
+        let originalLines = [];
+        let currentHiddenCount = 0;
+        let maxWordsInLine = 0;
+
+        function loadText() {
+            const textInput = document.getElementById('textInput').value.trim();
+            if (!textInput) {
+                alert('Пожалуйста, введите текст');
+                return;
+            }
+
+            originalLines = textInput.split('\n').filter(line => line.trim() !== '');
+            currentHiddenCount = 0;
+            
+            // Сворачиваем textarea
+            document.getElementById('textInput').classList.add('collapsed');
+            
+            // Находим максимальное количество скрываемых слов (исключая числа в начале строк)
+            maxWordsInLine = Math.max(...originalLines.map(line => {
+                const words = line.split(/\s+/);
+                let count = 0;
+                
+                // Считаем только слова, которые не являются числами в начале строки
+                words.forEach((word, index) => {
+                    // Если это не первое слово ИЛИ первое слово не является числом
+                    if (index > 0 || !/^\d+\.?$/.test(word)) {
+                        count++;
+                    }
+                });
+                
+                return count;
+            }));
+            
+            displayText();
+            updateButtons();
+        }
+
+        function displayText() {
+            const textOutput = document.getElementById('textOutput');
+            textOutput.innerHTML = '';
+
+            originalLines.forEach((line, lineIndex) => {
+                const lineDiv = document.createElement('div');
+                lineDiv.className = 'line';
+                
+                const words = line.split(/\s+/);
+                let hiddenWordsInThisLine = 0;
+                
+                words.forEach((word, wordIndex) => {
+                    const span = document.createElement('span');
+                    
+                    // Проверяем, является ли слово числом в начале строки
+                    const isNumberAtStart = wordIndex === 0 && /^\d+\.?$/.test(word);
+                    
+                    if (!isNumberAtStart && hiddenWordsInThisLine < currentHiddenCount) {
+                        // Скрытое слово - первая буква + три точки
+                        span.textContent = word.charAt(0) + '...';
+                        span.className = 'hidden-word';
+                        hiddenWordsInThisLine++;
+                    } else {
+                        span.textContent = word;
+                    }
+                    
+                    lineDiv.appendChild(span);
+                    
+                    // Добавляем пробел между словами
+                    if (wordIndex < words.length - 1) {
+                        lineDiv.appendChild(document.createTextNode(' '));
+                    }
+                });
+                
+                textOutput.appendChild(lineDiv);
+            });
+
+            updateButtons();
+        }
+
+        function hideNextWords() {
+            if (currentHiddenCount < maxWordsInLine) {
+                currentHiddenCount++;
+                displayText();
+            }
+        }
+
+        function showPreviousWords() {
+            if (currentHiddenCount > 0) {
+                currentHiddenCount--;
+                displayText();
+            }
+        }
+
+        function updateButtons() {
+            const hideButton = document.getElementById('hideButton');
+            const backButton = document.getElementById('backButton');
+            const counter = document.getElementById('counter');
+            
+            hideButton.disabled = currentHiddenCount >= maxWordsInLine;
+            backButton.disabled = currentHiddenCount <= 0;
+            
+            // Обновляем счетчик
+            counter.textContent = `${currentHiddenCount}/${maxWordsInLine}`;
+        }
+
+        function showAllText() {
+            // Разворачиваем textarea
+            document.getElementById('textInput').classList.remove('collapsed');
+            
+            // Сбрасываем состояние
+            currentHiddenCount = 0;
+            originalLines = [];
+            document.getElementById('hideButton').disabled = true;
+            document.getElementById('backButton').disabled = true;
+            document.getElementById('counter').textContent = '';
+            document.getElementById('textOutput').innerHTML = '';
+        }
+
+        // Обработка Enter в текстовом поле
+        document.getElementById('textInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && e.ctrlKey) {
+                loadText();
+            }
+        });
+    </script>
+</body>
+</html>
